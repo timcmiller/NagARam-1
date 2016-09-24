@@ -1,9 +1,8 @@
 'use strict';
 
 var Alexa = require('alexa-sdk');
-var APP_ID = undefined; //OPTIONAL: replace with 'amzn1.echo-sdk-ams.app.[your-unique-value-here]';
-var SKILL_NAME = 'NagARam"';
-var recipes = require('./recipes');
+var SKILL_NAME = 'Nag A Ram';
+var APP_ID = undefined;
 var http = require('http');
 
 exports.handler = function(event, context, callback) {
@@ -15,11 +14,11 @@ exports.handler = function(event, context, callback) {
 
 var handlers = {
     'NewSession': function () {
-        this.attributes['speechOutput'] = 'Welcome to ' + SKILL_NAME + '. You can ask a question like, what\'s the' +
-            ' recipe for a chest? ... Now, what can I help you with.';
+        this.attributes['speechOutput'] = 'Welcome to ' + SKILL_NAME + '. You can ask a question like, what\'s an' +
+            ' anagram for dog?.';
         // If the user either does not reply to the welcome message or says something that is not
         // understood, they will be prompted again with this text.
-        this.attributes['repromptSpeech'] = 'For instructions on what you can say, please say help me.';
+        this.attributes['repromptSpeech'] = 'I\'m sorry, I didn\'t catch that. Please try again.';
         this.emit(':ask', this.attributes['speechOutput'], this.attributes['repromptSpeech'])
     },
     'GetAnagram': function() {
@@ -39,19 +38,40 @@ var handlers = {
         var cardTitle = "NagARam";
         var recipe = "Where does this show up?";
 
-
+        var self = this;
         http.get("http://www.anagramica.com/best/:" + receivedWord, function(res) { 
-            console.log("Got response: " + res.statusCode); 
+            var string = '';
+            res.on('data', function(chunk) {
+                string += chunk;
+            });
 
-            //Alexa Talking 
-            this.attributes['speechOutput'] = "You said " + receivedWord;
-            this.attributes['repromptSpeech'] = 'Try saying repeat.';
-            this.emit(':askWithCard', recipe, this.attributes['repromptSpeech'], cardTitle, recipe);
+            res.on('end', function() {
+
+                var array = JSON.parse(string).best;
+                for(var i = 0; i < array.length; i++) {
+                    if(array[i] != receivedWord) {
+                        var result = array[i];
+                        break;
+                    }
+                };
+                if(!result) {
+                    var bad_stuff = "I cannot find an anagram for " + receivedWord + ", try another word";
+                    self.attributes['speechOutput'] = bad_stuff;
+                    self.emit(':askWithCard', bad_stuff, self.attributes['repromptSpeech'], cardTitle, bad_stuff);
+ 
+                }
+                var good_stuff = "An anagram for " + receivedWord + " is " + result;
+                self.attributes['speechOutput'] = good_stuff;
+                self.emit(':askWithCard', good_stuff, self.attributes['repromptSpeech'], cardTitle, good_stuff);
+ 
+            });
 
         }).on('error', function(e) { 
             console.log("Got error: " + e.message); context.done(null, 'FAILURE'); 
-            this.attributes['speechOutput'] = "Error on function Get Anagram";
-        }); 
+            var unknown_stuff = "I don't know that word";
+            self.attributes['speechOutput'] = unknown_stuff;
+            self.emit(':askWithCard', unknown_stuff, self.attributes['repromptSpeech'], cardTitle, unknown_stuff);
+        }).end(); 
         
         //Word being used is person
         
